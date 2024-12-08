@@ -5,7 +5,7 @@ description = ""
 authors = ["Your Name <you@example.com>"]
 
 [tool.poetry.dependencies]
-python = ">=3.11,<3.12"
+python = "3.11.10"
 flask = "^3.0.3"
 requests = "^2.32.3"
 twilio = "^7.21.0"  # For WhatsApp API via Twilio
