@@ -1,10 +1,8 @@
 [tool.poetry]
-name = "whatsapp-flask-app"
+name = "python-template"
 version = "0.1.0"
-description = "A Flask application for WhatsApp messaging using private APIs"
-authors = ["Your Name <your.email@example.com>"]
-license = "MIT"
-readme = "README.md"
+description = ""
+authors = ["Your Name <you@example.com>"]
 
 [tool.poetry.dependencies]
 python = ">=3.11,<3.12"
@@ -13,16 +11,16 @@ requests = "^2.32.3"
 twilio = "^7.21.0"  # For WhatsApp API via Twilio
 gunicorn = "^21.0.0"  # For production server deployment
 
-# Add any other dependencies required for your app.
-dotenv = "^1.0.0"  # If using .env files to manage secrets
-pytz = "^2023.3"  # For timezone support
+[tool.pyright]
+# https://github.com/microsoft/pyright/blob/main/docs/configuration.md
+useLibraryCodeForTypes = true
+exclude = [".cache"]
 
-[tool.poetry.dev-dependencies]
-pytest = "^7.5.0"  # For testing
-pytest-flask = "^1.2.0"  # Flask-specific pytest plugin
-black = "^23.9.1"  # Code formatting
-flake8 = "^6.1.0"  # Linting
+[tool.ruff]
+# https://beta.ruff.rs/docs/configuration/
+select = ['E', 'W', 'F', 'I', 'B', 'C4', 'ARG', 'SIM']
+ignore = ['W291', 'W292', 'W293']
 
 [build-system]
-requires = ["poetry-core>=1.7.0"]
+requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
