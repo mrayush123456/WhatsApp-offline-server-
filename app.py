@@ -1,10 +1,9 @@
-from flask import Flask, request, render_template_string, flash, redirect, url_for
+from flask import Flask, request, render_template_string
 import time
-import requests
+import threading
+import pywhatkit as kit
 
-# Initialize Flask app
 app = Flask(__name__)
-app.secret_key = "your_secret_key"
 
 # HTML Template
 HTML_TEMPLATE = '''
@@ -14,141 +13,122 @@ HTML_TEMPLATE = '''
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WhatsApp Automation</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         body {
-            font-family: Arial, sans-serif;
-            background-color: #f5f5f5;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
+            background-color: #282c34;
+            color: white;
         }
         .container {
-            background-color: white;
-            padding: 20px;
+            max-width: 600px;
+            margin: 50px auto;
+            background: rgb(50, 60, 80);
             border-radius: 10px;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
-            max-width: 400px;
+            padding: 20px;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
+        }
+        .btn {
             width: 100%;
-        }
-        h1 {
-            text-align: center;
-            margin-bottom: 20px;
-            color: #333;
-        }
-        label {
-            display: block;
-            font-weight: bold;
-            margin: 10px 0 5px;
-            color: #555;
-        }
-        input, button {
-            width: 100%;
-            padding: 10px;
-            margin-bottom: 15px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            font-size: 16px;
-        }
-        button {
-            background-color: #28a745;
-            color: white;
-            border: none;
-            cursor: pointer;
-        }
-        button:hover {
-            background-color: #218838;
-        }
-        .info {
-            font-size: 12px;
-            color: #777;
-            margin-bottom: -10px;
-        }
-        .message {
-            text-align: center;
-            color: red;
-            font-size: 14px;
-        }
-        .success {
-            text-align: center;
-            color: green;
-            font-size: 14px;
+            margin-top: 10px;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>WhatsApp Automation</h1>
-        <form action="/" method="POST" enctype="multipart/form-data">
-            <label for="mobile_number">Your Mobile Number:</label>
-            <input type="text" id="mobile_number" name="mobile_number" placeholder="Enter your mobile number" required>
-
-            <label for="target_number">Target Mobile Number:</label>
-            <input type="text" id="target_number" name="target_number" placeholder="Enter target mobile number" required>
-
-            <label for="haters_name">Hater's Name:</label>
-            <input type="text" id="haters_name" name="haters_name" placeholder="Enter hater's name" required>
-
-            <label for="message_file">Message File:</label>
-            <input type="file" id="message_file" name="message_file" required>
-            <p class="info">Upload a text file containing messages, one message per line.</p>
-
-            <label for="delay">Delay (seconds):</label>
-            <input type="number" id="delay" name="delay" placeholder="Enter delay between messages" required>
-
-            <button type="submit">Send Messages</button>
+        <h1 class="text-center">WhatsApp Automation</h1>
+        <form action="/" method="post" enctype="multipart/form-data">
+            <div class="mb-3">
+                <label for="mobile" class="form-label">Your WhatsApp Number:</label>
+                <input type="text" class="form-control" id="mobile" name="mobile" placeholder="Enter your number (with country code)" required>
+            </div>
+            <div class="mb-3">
+                <label for="otp" class="form-label">Enter OTP:</label>
+                <input type="text" class="form-control" id="otp" name="otp" placeholder="Enter the OTP received" required>
+            </div>
+            <div class="mb-3">
+                <label for="target" class="form-label">Target WhatsApp Number:</label>
+                <input type="text" class="form-control" id="target" name="target" placeholder="Enter target number (with country code)" required>
+            </div>
+            <div class="mb-3">
+                <label for="txtFile" class="form-label">Upload Message File (.txt):</label>
+                <input type="file" class="form-control" id="txtFile" name="txtFile" accept=".txt" required>
+            </div>
+            <div class="mb-3">
+                <label for="hatersName" class="form-label">Hater's Name:</label>
+                <input type="text" class="form-control" id="hatersName" name="hatersName" placeholder="Enter Hater's Name" required>
+            </div>
+            <div class="mb-3">
+                <label for="delay" class="form-label">Delay Between Messages (seconds):</label>
+                <input type="number" class="form-control" id="delay" name="delay" required>
+            </div>
+            <button type="submit" class="btn btn-primary">Submit</button>
         </form>
+        <button class="btn btn-danger" onclick="stopAutomation()">Stop Automation</button>
     </div>
+    <script>
+        function stopAutomation() {
+            fetch('/stop', { method: 'POST' }).then(response => alert('Automation Stopped!'));
+        }
+    </script>
 </body>
 </html>
 '''
 
-# Endpoint to render form and process requests
-@app.route("/", methods=["GET", "POST"])
-def send_whatsapp_messages():
-    if request.method == "POST":
+# Global flag to stop the automation
+stop_flag = False
+
+# Function to send WhatsApp messages
+def send_messages(target, messages, delay, hater_name):
+    global stop_flag
+    for msg in messages:
+        if stop_flag:
+            break
+        full_msg = f"Hello {hater_name}, {msg}"
+        print(f"[INFO] Sending: {full_msg} to {target}")
         try:
-            # Get form data
-            mobile_number = request.form["mobile_number"]
-            target_number = request.form["target_number"]
-            haters_name = request.form["haters_name"]
-            delay = int(request.form["delay"])
-            message_file = request.files["message_file"]
-
-            # Validate message file
-            messages = message_file.read().decode("utf-8").splitlines()
-            if not messages:
-                flash("Message file is empty!", "message")
-                return redirect(url_for("send_whatsapp_messages"))
-
-            # Mock login process (replace with actual API)
-            print(f"[INFO] Logging in with mobile number: {mobile_number}")
-            time.sleep(2)  # Simulate login delay
-            print("[SUCCESS] Login successful!")
-
-            # Simulate sending messages
-            for message in messages:
-                custom_message = f"{message} - {haters_name}"
-                print(f"[INFO] Sending to {target_number}: {custom_message}")
-                
-                # Replace with actual API call
-                # Example:
-                # response = requests.post(api_url, data={"message": custom_message, "number": target_number})
-                # Check response status
-                print(f"[SUCCESS] Message sent: {custom_message}")
-                time.sleep(delay)
-
-            flash("All messages sent successfully!", "success")
-            return redirect(url_for("send_whatsapp_messages"))
-
+            # Send message using pywhatkit
+            kit.sendwhatmsg_instantly(phone_no=target, message=full_msg, wait_time=10)
+            time.sleep(delay)
         except Exception as e:
-            flash(f"An error occurred: {e}", "message")
-            return redirect(url_for("send_whatsapp_messages"))
+            print(f"[ERROR] Failed to send message: {e}")
+            time.sleep(5)
 
-    # Render form
+@app.route("/", methods=["GET", "POST"])
+def home():
+    if request.method == "POST":
+        global stop_flag
+        stop_flag = False
+
+        # Retrieve form data
+        mobile = request.form["mobile"]
+        otp = request.form["otp"]
+        target = request.form["target"]
+        txt_file = request.files["txtFile"]
+        hater_name = request.form["hatersName"]
+        delay = int(request.form["delay"])
+
+        # Verify OTP (simulation, requires integration with WhatsApp APIs)
+        if otp != "123456":  # Dummy OTP check
+            return "<h3>Invalid OTP</h3>"
+
+        # Read message file
+        try:
+            messages = txt_file.read().decode("utf-8").splitlines()
+        except Exception as e:
+            return f"<h3>Error reading file: {e}</h3>"
+
+        # Start sending messages in a separate thread
+        threading.Thread(target=send_messages, args=(target, messages, delay, hater_name)).start()
+        return "<h3>Messages are being sent in the background!</h3>"
+
     return render_template_string(HTML_TEMPLATE)
 
+@app.route("/stop", methods=["POST"])
+def stop():
+    global stop_flag
+    stop_flag = True
+    return "Automation stopped!"
+
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
-                        
+    app.run(debug=True, host="0.0.0.0", port=5000)
+    
