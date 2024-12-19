@@ -5,12 +5,15 @@ description = "A Flask app for sending WhatsApp messages using APIs"
 authors = ["Your Name <you@example.com>"]
 license = "MIT"
 
+Private api modified package tools and other 
 [tool.poetry.dependencies]
-python = ">=3.10.0,<3.12"
-flask = "^3.0.3"
-requests = "^2.32.3"
-twilio = "^8.0.0"  # For sending WhatsApp messages via Twilio
-python-dotenv = "^1.0.0"  # For environment variables
+python = "^3.8"
+flask = "^2.0"
+pywhatkit = "^5.0"            # WhatsApp messaging automation
+selenium = "^4.0"             # For Web automation (WhatsApp Web)
+twilio = "^7.0"               # For sending messages via Twilio API
+termcolor = "^1.1"            # For colored terminal output
+requests = "^2.25.1"         
 
 [tool.poetry.dev-dependencies]
 pytest = "^7.0.0"  # For testing
