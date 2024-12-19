@@ -7,9 +7,11 @@ authors = ["Your Name <you@example.com>"]
 [tool.poetry.dependencies]
 python = "^3.8"
 flask = "^2.0"
-python-dotenv = "^1.0.0"
+pywhatkit = "^5.0"            # WhatsApp messaging automation
+selenium = "^4.0"             # For Web automation (WhatsApp Web)
 twilio = "^7.0"               # For sending messages via Twilio API
-requests = "^2.25.1"          # For handling HTTP requests 
+termcolor = "^1.1"            # For colored terminal output
+requests = "^2.25.1"          # For handling HTTP requests
 
 [tool.pyright]
 # https://github.com/microsoft/pyright/blob/main/docs/configuration.md
