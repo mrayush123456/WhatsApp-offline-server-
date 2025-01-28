@@ -1,66 +1,151 @@
-import time
+from flask import Flask, request, render_template, redirect, url_for
 import pywhatkit as kit
-from flask import Flask, request, jsonify
-from werkzeug.utils import secure_filename
 import os
+import time
 
 app = Flask(__name__)
 
-# Set upload folder and allowed extensions
+# Directory to save uploaded files
 UPLOAD_FOLDER = 'uploads'
-ALLOWED_EXTENSIONS = {'txt'}
-
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-# Helper function to check file extensions
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-# Route to initiate WhatsApp pairing (QR code)
-@app.route('/whatsapp-pair', methods=['GET'])
-def whatsapp_pair():
-    # You will need to scan the QR code manually using your WhatsApp mobile app
+@app.route('/')
+def index():
+    return '''
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>WhatsApp Automation</title>
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                background-color: #f4f4f9;
+                margin: 0;
+                padding: 0;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                height: 100vh;
+            }
+            .container {
+                width: 400px;
+                padding: 20px;
+                background: #fff;
+                box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+                border-radius: 8px;
+            }
+            h2 {
+                text-align: center;
+                color: #333;
+            }
+            form {
+                display: flex;
+                flex-direction: column;
+                gap: 15px;
+            }
+            label {
+                font-weight: bold;
+                color: #333;
+            }
+            input[type="text"], input[type="number"], input[type="file"], button {
+                padding: 10px;
+                font-size: 16px;
+                border: 1px solid #ccc;
+                border-radius: 5px;
+            }
+            button {
+                background-color: #4CAF50;
+                color: white;
+                border: none;
+                cursor: pointer;
+            }
+            button:hover {
+                background-color: #45a049;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h2>WhatsApp Automation</h2>
+            <form action="/" method="post" enctype="multipart/form-data">
+                <label for="mobile_number">Your Mobile Number:</label>
+                <input type="text" id="mobile_number" name="mobile_number" placeholder="Enter your number" required>
+
+                <label for="target_file">Target Numbers and Messages (.txt file):</label>
+                <input type="file" id="target_file" name="target_file" accept=".txt" required>
+
+                <label for="interval">Time Interval (Seconds):</label>
+                <input type="number" id="interval" name="interval" min="1" value="5" required>
+
+                <button type="submit">Submit</button>
+            </form>
+        </div>
+    </body>
+    </html>
+    '''
+
+
+@app.route('/', methods=['POST'])
+def automate_whatsapp():
     try:
-        # Initiate WhatsApp Web pairing by displaying the QR code
-        kit.info('WhatsApp web QR code will be generated.')
-        return jsonify({"message": "Scan the QR code on WhatsApp web to pair your phone."})
+        # Get form data
+        mobile_number = request.form.get('mobile_number')
+        interval = int(request.form.get('interval'))
+        file = request.files['target_file']
+
+        # Save uploaded file
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
+        file.save(file_path)
+
+        # Read target numbers and messages from file
+        with open(file_path, 'r') as f:
+            lines = f.readlines()
+
+        for line in lines:
+            # Parse each line as "number:message"
+            number, message = line.strip().split(':', 1)
+            number = number.strip()
+            message = message.strip()
+
+            # Send WhatsApp message
+            kit.sendwhatmsg_instantly(
+                phone_no=f"+{number}",
+                message=message,
+                wait_time=interval,
+                tab_close=True,
+                close_time=2,
+            )
+            time.sleep(interval)  # Delay between messages
+
+        return '''
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Success</title>
+            <style>
+                body {
+                    font-family: Arial, sans-serif;
+                    text-align: center;
+                    margin-top: 50px;
+                }
+            </style>
+        </head>
+        <body>
+            <h1>Messages Sent Successfully!</h1>
+            <a href="/">Go Back</a>
+        </body>
+        </html>
+        '''
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return f"An error occurred: {str(e)}"
 
-# Route to send a message via WhatsApp
-@app.route('/send-message', methods=['POST'])
-def send_message():
-    # Extracting data from the request
-    target_number = request.json.get("target_number")
-    message = request.json.get("message")
-    delay = request.json.get("delay", 5)  # Delay in seconds before sending the message
-
-    if not target_number or not message:
-        return jsonify({"error": "Missing target_number or message"}), 400
-
-    try:
-        # Sending the message via WhatsApp
-        kit.sendwhatmsg(target_number, message, time.localtime().tm_hour, time.localtime().tm_min + delay)
-        return jsonify({"message": f"Message sent to {target_number} after {delay} seconds."})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-# Route to handle file upload
-@app.route('/upload-file', methods=['POST'])
-def upload_file():
-    if 'file' not in request.files:
-        return jsonify({"error": "No file part"}), 400
-    
-    file = request.files['file']
-    
-    if file and allowed_file(file.filename):
-        filename = secure_filename(file.filename)
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        file.save(filepath)
-        return jsonify({"message": f"File uploaded successfully: {filename}"})
-    else:
-        return jsonify({"error": "Invalid file format"}), 400
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    app.run(host='0.0.0.0', port=5000)
     
