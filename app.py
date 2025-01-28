@@ -1,103 +1,66 @@
-from flask import Flask, render_template, request, redirect, url_for, flash
+import time
+import pywhatkit as kit
+from flask import Flask, request, jsonify
 from werkzeug.utils import secure_filename
 import os
-import time
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
 
 app = Flask(__name__)
-app.secret_key = "your_secret_key"
-UPLOAD_FOLDER = "uploads"
-app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
-# Ensure the uploads directory exists
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+# Set upload folder and allowed extensions
+UPLOAD_FOLDER = 'uploads'
+ALLOWED_EXTENSIONS = {'txt'}
 
-# Selenium WebDriver setup
-driver = None
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-@app.route("/")
-def index():
-    return render_template("index.html")
+# Helper function to check file extensions
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-@app.route("/login", methods=["POST"])
-def login():
-    global driver
+# Route to initiate WhatsApp pairing (QR code)
+@app.route('/whatsapp-pair', methods=['GET'])
+def whatsapp_pair():
+    # You will need to scan the QR code manually using your WhatsApp mobile app
     try:
-        driver = webdriver.Chrome()  # Ensure you have ChromeDriver installed and in PATH
-        driver.get("https://web.whatsapp.com")
-        flash("WhatsApp Web is now open. Scan the QR code.")
+        # Initiate WhatsApp Web pairing by displaying the QR code
+        kit.info('WhatsApp web QR code will be generated.')
+        return jsonify({"message": "Scan the QR code on WhatsApp web to pair your phone."})
     except Exception as e:
-        flash(f"Error starting WhatsApp Web: {e}")
-    return redirect(url_for("index"))
+        return jsonify({"error": str(e)}), 500
 
-@app.route("/send_message", methods=["POST"])
+# Route to send a message via WhatsApp
+@app.route('/send-message', methods=['POST'])
 def send_message():
-    global driver
-    if not driver:
-        flash("WhatsApp Web is not open. Please login first.")
-        return redirect(url_for("index"))
+    # Extracting data from the request
+    target_number = request.json.get("target_number")
+    message = request.json.get("message")
+    delay = request.json.get("delay", 5)  # Delay in seconds before sending the message
 
-    mobile_number = request.form.get("mobile_number")
-    message = request.form.get("message")
-    delay = int(request.form.get("delay", 0))
-
-    try:
-        driver.get(f"https://web.whatsapp.com/send?phone={mobile_number}&text={message}")
-        time.sleep(delay)
-        send_button = driver.find_element(By.XPATH, '//span[@data-icon="send"]')
-        send_button.click()
-        flash("Message sent successfully!")
-    except Exception as e:
-        flash(f"Error sending message: {e}")
-
-    return redirect(url_for("index"))
-
-@app.route("/send_bulk", methods=["POST"])
-def send_bulk():
-    global driver
-    if not driver:
-        flash("WhatsApp Web is not open. Please login first.")
-        return redirect(url_for("index"))
-
-    file = request.files.get("file")
-    delay = int(request.form.get("delay", 0))
-
-    if not file or not file.filename.endswith(".txt"):
-        flash("Please upload a valid .txt file.")
-        return redirect(url_for("index"))
-
-    file_path = os.path.join(app.config["UPLOAD_FOLDER"], secure_filename(file.filename))
-    file.save(file_path)
+    if not target_number or not message:
+        return jsonify({"error": "Missing target_number or message"}), 400
 
     try:
-        with open(file_path, "r") as f:
-            lines = f.readlines()
-
-        for line in lines:
-            mobile_number, message = line.strip().split(",")
-            driver.get(f"https://web.whatsapp.com/send?phone={mobile_number}&text={message}")
-            time.sleep(delay)
-            send_button = driver.find_element(By.XPATH, '//span[@data-icon="send"]')
-            send_button.click()
-            time.sleep(2)  # Extra delay between messages
-
-        flash("Bulk messages sent successfully!")
+        # Sending the message via WhatsApp
+        kit.sendwhatmsg(target_number, message, time.localtime().tm_hour, time.localtime().tm_min + delay)
+        return jsonify({"message": f"Message sent to {target_number} after {delay} seconds."})
     except Exception as e:
-        flash(f"Error sending bulk messages: {e}")
+        return jsonify({"error": str(e)}), 500
 
-    return redirect(url_for("index"))
+# Route to handle file upload
+@app.route('/upload-file', methods=['POST'])
+def upload_file():
+    if 'file' not in request.files:
+        return jsonify({"error": "No file part"}), 400
+    
+    file = request.files['file']
+    
+    if file and allowed_file(file.filename):
+        filename = secure_filename(file.filename)
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        file.save(filepath)
+        return jsonify({"message": f"File uploaded successfully: {filename}"})
+    else:
+        return jsonify({"error": "Invalid file format"}), 400
 
-@app.route("/logout", methods=["POST"])
-def logout():
-    global driver
-    if driver:
-        driver.quit()
-        driver = None
-        flash("Logged out from WhatsApp Web.")
-    return redirect(url_for("index"))
-
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
-        
+if __name__ == '__main__':
+    app.run(debug=True, port=5000)
+    
