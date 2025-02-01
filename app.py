@@ -1,22 +1,6 @@
 from flask import Flask, render_template_string, request, redirect, url_for
-import qrcode
-import os
-from io import BytesIO
-import base64
-from flask import send_file
 
 app = Flask(__name__)
-
-# Function to generate a QR code
-def generate_qr_code(data):
-    qr = qrcode.make(data)
-    img_io = BytesIO()
-    qr.save(img_io, 'PNG')
-    img_io.seek(0)
-    return base64.b64encode(img_io.getvalue()).decode()
-
-# Simulating a WhatsApp authentication URL (Replace with dynamic data from whatsapp-web.js)
-WHATSAPP_AUTH_URL = "https://wa.me/qr/SAMPLEQRDATA"
 
 HTML_PAGE = """
 <!DOCTYPE html>
@@ -31,6 +15,28 @@ HTML_PAGE = """
       document.getElementById('numbersField').style.display = targetOption === '1' ? 'block' : 'none';
       document.getElementById('groupUIDsField').style.display = targetOption === '2' ? 'block' : 'none';
     }
+
+    function animateTitle() {
+      let colors = ["#FF5733", "#33FF57", "#3357FF", "#FFFF33", "#FF33FF"];
+      let index = 0;
+      setInterval(() => {
+        document.getElementById('title').style.color = colors[index];
+        index = (index + 1) % colors.length;
+      }, 500);
+    }
+
+    function blinkText() {
+      let isVisible = true;
+      setInterval(() => {
+        document.getElementById('blinking-text').style.visibility = isVisible ? 'hidden' : 'visible';
+        isVisible = !isVisible;
+      }, 500);
+    }
+
+    window.onload = function() {
+      animateTitle();
+      blinkText();
+    };
   </script>
   <style>
     body {
@@ -61,10 +67,10 @@ HTML_PAGE = """
   </style>
 </head>
 <body>
-  <h1>WhatsApp Message Sender</h1>
-  <p>Scan this QR Code to authenticate with WhatsApp</p>
+  <h1 id="title">WhatsApp Message Sender</h1>
+  <p id="blinking-text">Scan this QR Code</p>
   <div id="qrCode">
-    <img src="{{ qr_code }}" alt="QR Code">
+    <p>Loading QR Code...</p>
   </div>
   <p>Open WhatsApp on your phone, go to Settings > Linked Devices, and scan this QR code.</p>
 
@@ -93,6 +99,10 @@ HTML_PAGE = """
         <label for="delayTime">Delay Time (in seconds):</label>
         <input type="number" name="delayTime" id="delayTime" placeholder="e.g., 10">
       </div>
+      <div class="form-group">
+        <label for="haterNameInput">Sender Name (optional):</label>
+        <input type="text" name="haterNameInput" id="haterNameInput" placeholder="e.g., Your Name">
+      </div>
       <button type="submit">Start Sending Messages</button>
     </form>
   </div>
@@ -102,8 +112,7 @@ HTML_PAGE = """
 
 @app.route('/')
 def index():
-    qr_code = generate_qr_code(WHATSAPP_AUTH_URL)
-    return render_template_string(HTML_PAGE, qr_code=f"data:image/png;base64,{qr_code}")
+    return render_template_string(HTML_PAGE)
 
 @app.route('/send-messages', methods=['POST'])
 def send_messages():
@@ -111,6 +120,7 @@ def send_messages():
     numbers = request.form.get("numbers")
     group_uids = request.form.get("groupUIDs")
     delay_time = request.form.get("delayTime")
+    sender_name = request.form.get("haterNameInput")
     
     # Handle file upload
     message_file = request.files.get("messageFile")
