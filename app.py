@@ -1,79 +1,79 @@
-from flask import Flask, request, render_template_string
-import time
+from flask import Flask, render_template_string, jsonify
+import random
+import string
+import socket
+import datetime
 
 app = Flask(__name__)
 
-# Function to generate WhatsApp login link
-def generate_whatsapp_link(number, device_code):
-    return f"https://api.whatsapp.com/send?phone={number}&text=Login%20Code:%20{device_code}"
+# Function to generate random username and password
+def generate_credentials():
+    username = "user" + str(random.randint(1000, 9999))
+    password = ''.join(random.choices(string.ascii_letters + string.digits, k=10))
+    return username, password
 
-@app.route("/", methods=["GET", "POST"])
+# Function to get the local IP address
+def get_ip():
+    hostname = socket.gethostname()
+    ip_address = socket.gethostbyname(hostname)
+    return hostname, ip_address
+
+# Generate RDP details
+def generate_rdp():
+    hostname, ip_address = get_ip()
+    username, password = generate_credentials()
+    port = random.choice([3389, 3390, 3391])  # Standard RDP ports
+    expiry_date = datetime.datetime.now() + datetime.timedelta(days=30)
+    
+    return {
+        "hostname": hostname,
+        "ip_address": ip_address,
+        "username": username,
+        "password": password,
+        "port": port,
+        "valid_until": expiry_date.strftime("%Y-%m-%d %H:%M:%S")
+    }
+
+# HTML template as a string
+html_template = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generated RDP Credentials</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; }
+        .container { margin-top: 50px; }
+        table { margin: 0 auto; border-collapse: collapse; width: 50%; }
+        th, td { padding: 10px; border: 1px solid black; text-align: left; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>RDP Credentials</h2>
+        <table>
+            <tr><th>Hostname</th><td>{{ rdp_data.hostname }}</td></tr>
+            <tr><th>IP Address</th><td>{{ rdp_data.ip_address }}</td></tr>
+            <tr><th>Username</th><td>{{ rdp_data.username }}</td></tr>
+            <tr><th>Password</th><td>{{ rdp_data.password }}</td></tr>
+            <tr><th>Port</th><td>{{ rdp_data.port }}</td></tr>
+            <tr><th>Valid Until</th><td>{{ rdp_data.valid_until }}</td></tr>
+        </table>
+    </div>
+</body>
+</html>
+"""
+
+@app.route('/')
 def home():
-    whatsapp_link = None
+    rdp_data = generate_rdp()
+    return render_template_string(html_template, rdp_data=rdp_data)
 
-    if request.method == "POST":
-        number = request.form["number"]
-        device_code = request.form["device_code"]
-        delay = int(request.form["delay"])
+@app.route('/api/rdp')
+def api_rdp():
+    return jsonify(generate_rdp())
 
-        # Delay before generating the link
-        time.sleep(delay)
-
-        # Generate WhatsApp login link
-        whatsapp_link = generate_whatsapp_link(number, device_code)
-
-        # Save to a text file
-        with open("whatsapp_links.txt", "a") as file:
-            file.write(f"{whatsapp_link}\n")
-
-    # HTML template directly embedded in Python
-    html_template = """
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>WhatsApp Login Link Generator</title>
-        <style>
-            body {
-                text-align: center;
-                font-family: Arial, sans-serif;
-                background: linear-gradient(45deg, #ff0000, #ff7300, #ffeb00, #47ff00, #00ffee, #0047ff, #7a00ff);
-                animation: gradient 10s infinite alternate;
-                color: white;
-            }
-            @keyframes gradient {
-                0% {background-position: left;}
-                100% {background-position: right;}
-            }
-            form {
-                margin-top: 50px;
-            }
-            input, button {
-                padding: 10px;
-                margin: 5px;
-            }
-        </style>
-    </head>
-    <body>
-        <h1>WhatsApp Login Link Generator</h1>
-        <form method="post">
-            <input type="text" name="number" placeholder="Enter Mobile Number with Country Code" required>
-            <input type="text" name="device_code" placeholder="Enter Device Code" required>
-            <input type="number" name="delay" placeholder="Delay (Seconds)" required>
-            <button type="submit">Generate</button>
-        </form>
-
-        {% if link %}
-        <h2>Your WhatsApp Link:</h2>
-        <a href="{{ link }}" target="_blank" style="color: yellow;">{{ link }}</a>
-        {% endif %}
-    </body>
-    </html>
-    """
-
-    return render_template_string(html_template, link=whatsapp_link)
-
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000, debug=True)
     
