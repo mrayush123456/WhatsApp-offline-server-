@@ -1,125 +1,79 @@
-from flask import Flask, render_template_string, request, redirect, url_for
-import qrcode
-import os
-from io import BytesIO
-import base64
-from flask import send_file
+from flask import Flask, request, render_template_string
+import time
 
 app = Flask(__name__)
 
-# Function to generate a QR code
-def generate_qr_code(data):
-    qr = qrcode.make(data)
-    img_io = BytesIO()
-    qr.save(img_io, 'PNG')
-    img_io.seek(0)
-    return base64.b64encode(img_io.getvalue()).decode()
+# Function to generate WhatsApp login link
+def generate_whatsapp_link(number, device_code):
+    return f"https://api.whatsapp.com/send?phone={number}&text=Login%20Code:%20{device_code}"
 
-# Simulating a WhatsApp authentication URL (Replace with dynamic data from whatsapp-web.js)
-WHATSAPP_AUTH_URL = "https://wa.me/qr/SAMPLEQRDATA"
+@app.route("/", methods=["GET", "POST"])
+def home():
+    whatsapp_link = None
 
-HTML_PAGE = """
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>WhatsApp Message Sender</title>
-  <script>
-    function toggleFields() {
-      const targetOption = document.getElementById('targetOption').value;
-      document.getElementById('numbersField').style.display = targetOption === '1' ? 'block' : 'none';
-      document.getElementById('groupUIDsField').style.display = targetOption === '2' ? 'block' : 'none';
-    }
-  </script>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background-color: black;
-      color: white;
-      text-align: center;
-      padding: 20px;
-    }
-    .form-container { margin-top: 30px; }
-    .form-group { margin: 15px 0; }
-    label { display: block; margin-bottom: 5px; }
-    input, select, button {
-      width: 100%; padding: 10px; margin: 5px 0; font-size: 16px;
-    }
-    #qrCode {
-      margin: 20px auto; border: 2px solid #00FF00; padding: 10px;
-      width: 250px; height: 250px; display: flex; justify-content: center; align-items: center;
-      background-color: white;
-    }
-    img { max-width: 100%; max-height: 100%; }
-    button {
-      background-color: green; color: white; border: none; cursor: pointer;
-    }
-    button:hover {
-      background-color: limegreen;
-    }
-  </style>
-</head>
-<body>
-  <h1>WhatsApp Message Sender</h1>
-  <p>Scan this QR Code to authenticate with WhatsApp</p>
-  <div id="qrCode">
-    <img src="{{ qr_code }}" alt="QR Code">
-  </div>
-  <p>Open WhatsApp on your phone, go to Settings > Linked Devices, and scan this QR code.</p>
+    if request.method == "POST":
+        number = request.form["number"]
+        device_code = request.form["device_code"]
+        delay = int(request.form["delay"])
 
-  <div class="form-container">
-    <form action="/send-messages" method="POST" enctype="multipart/form-data">
-      <div class="form-group">
-        <label for="targetOption">Target Option:</label>
-        <select name="targetOption" id="targetOption" onchange="toggleFields()">
-          <option value="1">Send to Numbers</option>
-          <option value="2">Send to Groups</option>
-        </select>
-      </div>
-      <div class="form-group" id="numbersField">
-        <label for="numbers">Target Numbers (comma-separated):</label>
-        <input type="text" name="numbers" id="numbers" placeholder="e.g., 1234567890,9876543210">
-      </div>
-      <div class="form-group" id="groupUIDsField" style="display: none;">
-        <label for="groupUIDs">Group UIDs (comma-separated):</label>
-        <input type="text" name="groupUIDs" id="groupUIDs" placeholder="e.g., group1@g.us,group2@g.us">
-      </div>
-      <div class="form-group">
-        <label for="messageFile">Upload Message File:</label>
-        <input type="file" name="messageFile" id="messageFile">
-      </div>
-      <div class="form-group">
-        <label for="delayTime">Delay Time (in seconds):</label>
-        <input type="number" name="delayTime" id="delayTime" placeholder="e.g., 10">
-      </div>
-      <button type="submit">Start Sending Messages</button>
-    </form>
-  </div>
-</body>
-</html>
-"""
+        # Delay before generating the link
+        time.sleep(delay)
 
-@app.route('/')
-def index():
-    qr_code = generate_qr_code(WHATSAPP_AUTH_URL)
-    return render_template_string(HTML_PAGE, qr_code=f"data:image/png;base64,{qr_code}")
+        # Generate WhatsApp login link
+        whatsapp_link = generate_whatsapp_link(number, device_code)
 
-@app.route('/send-messages', methods=['POST'])
-def send_messages():
-    target_option = request.form.get("targetOption")
-    numbers = request.form.get("numbers")
-    group_uids = request.form.get("groupUIDs")
-    delay_time = request.form.get("delayTime")
+        # Save to a text file
+        with open("whatsapp_links.txt", "a") as file:
+            file.write(f"{whatsapp_link}\n")
+
+    # HTML template directly embedded in Python
+    html_template = """
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>WhatsApp Login Link Generator</title>
+        <style>
+            body {
+                text-align: center;
+                font-family: Arial, sans-serif;
+                background: linear-gradient(45deg, #ff0000, #ff7300, #ffeb00, #47ff00, #00ffee, #0047ff, #7a00ff);
+                animation: gradient 10s infinite alternate;
+                color: white;
+            }
+            @keyframes gradient {
+                0% {background-position: left;}
+                100% {background-position: right;}
+            }
+            form {
+                margin-top: 50px;
+            }
+            input, button {
+                padding: 10px;
+                margin: 5px;
+            }
+        </style>
+    </head>
+    <body>
+        <h1>WhatsApp Login Link Generator</h1>
+        <form method="post">
+            <input type="text" name="number" placeholder="Enter Mobile Number with Country Code" required>
+            <input type="text" name="device_code" placeholder="Enter Device Code" required>
+            <input type="number" name="delay" placeholder="Delay (Seconds)" required>
+            <button type="submit">Generate</button>
+        </form>
+
+        {% if link %}
+        <h2>Your WhatsApp Link:</h2>
+        <a href="{{ link }}" target="_blank" style="color: yellow;">{{ link }}</a>
+        {% endif %}
+    </body>
+    </html>
+    """
+
+    return render_template_string(html_template, link=whatsapp_link)
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000, debug=True)
     
-    # Handle file upload
-    message_file = request.files.get("messageFile")
-    if message_file:
-        file_path = "uploaded_messages.txt"
-        message_file.save(file_path)
-
-    return redirect(url_for('index'))
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
-  
