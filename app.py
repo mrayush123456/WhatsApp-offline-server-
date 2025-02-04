@@ -23,6 +23,38 @@ def home():
             <html>
             <head>
                 <title>RDP Generator</title>
+                <style>
+                    body {
+                        font-size: 16px;
+                        background: #0f0f0f;
+                        color: white;
+                        animation: backgroundAnimation 10s infinite alternate;
+                        background-image: url('https://via.placeholder.com/1920x1080');
+                        background-size: cover;
+                    }
+                    @keyframes backgroundAnimation {
+                        0% { background-color: #0f0f0f; }
+                        100% { background-color: #2f2f2f; }
+                    }
+                    h2 {
+                        text-align: center;
+                    }
+                    form {
+                        text-align: center;
+                    }
+                    button {
+                        margin-top: 10px;
+                        padding: 10px 20px;
+                        font-size: 18px;
+                        background-color: #333;
+                        color: white;
+                        border: none;
+                        cursor: pointer;
+                    }
+                    button:hover {
+                        background-color: #555;
+                    }
+                </style>
             </head>
             <body>
                 <h2>Random RDP Generator</h2>
@@ -51,6 +83,38 @@ def home():
         <html>
         <head>
             <title>RDP Generator</title>
+            <style>
+                body {
+                    font-size: 16px;
+                    background: #0f0f0f;
+                    color: white;
+                    animation: backgroundAnimation 10s infinite alternate;
+                    background-image: url('https://via.placeholder.com/1920x1080');
+                    background-size: cover;
+                }
+                @keyframes backgroundAnimation {
+                    0% { background-color: #0f0f0f; }
+                    100% { background-color: #2f2f2f; }
+                }
+                h2 {
+                    text-align: center;
+                }
+                form {
+                    text-align: center;
+                }
+                button {
+                    margin-top: 10px;
+                    padding: 10px 20px;
+                    font-size: 18px;
+                    background-color: #333;
+                    color: white;
+                    border: none;
+                    cursor: pointer;
+                }
+                button:hover {
+                    background-color: #555;
+                }
+            </style>
         </head>
         <body>
             <h2>Random RDP Generator</h2>
