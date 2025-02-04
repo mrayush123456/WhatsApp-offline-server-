@@ -25,34 +25,43 @@ def home():
                 <title>RDP Generator</title>
                 <style>
                     body {
-                        font-size: 16px;
-                        background: #0f0f0f;
-                        color: white;
-                        animation: backgroundAnimation 10s infinite alternate;
-                        background-image: url('https://via.placeholder.com/1920x1080');
-                        background-size: cover;
-                    }
-                    @keyframes backgroundAnimation {
-                        0% { background-color: #0f0f0f; }
-                        100% { background-color: #2f2f2f; }
+                        font-size: 20px;
+                        background: linear-gradient(45deg, #ff6b6b, #f9d423);
+                        background-size: 400% 400%;
+                        animation: gradientAnimation 10s ease infinite;
+                        color: #333;
+                        font-family: Arial, sans-serif;
                     }
                     h2 {
                         text-align: center;
                     }
-                    form {
-                        text-align: center;
-                    }
                     button {
-                        margin-top: 10px;
                         padding: 10px 20px;
-                        font-size: 18px;
-                        background-color: #333;
-                        color: white;
+                        background-color: #008CBA;
                         border: none;
+                        color: white;
+                        font-size: 18px;
                         cursor: pointer;
                     }
                     button:hover {
-                        background-color: #555;
+                        background-color: #005f73;
+                    }
+                    p {
+                        font-size: 18px;
+                    }
+                    label {
+                        font-size: 18px;
+                    }
+                    @keyframes gradientAnimation {
+                        0% {
+                            background-position: 0% 50%;
+                        }
+                        50% {
+                            background-position: 100% 50%;
+                        }
+                        100% {
+                            background-position: 0% 50%;
+                        }
                     }
                 </style>
             </head>
@@ -85,34 +94,40 @@ def home():
             <title>RDP Generator</title>
             <style>
                 body {
-                    font-size: 16px;
-                    background: #0f0f0f;
-                    color: white;
-                    animation: backgroundAnimation 10s infinite alternate;
-                    background-image: url('https://via.placeholder.com/1920x1080');
-                    background-size: cover;
-                }
-                @keyframes backgroundAnimation {
-                    0% { background-color: #0f0f0f; }
-                    100% { background-color: #2f2f2f; }
+                    font-size: 20px;
+                    background: linear-gradient(45deg, #ff6b6b, #f9d423);
+                    background-size: 400% 400%;
+                    animation: gradientAnimation 10s ease infinite;
+                    color: #333;
+                    font-family: Arial, sans-serif;
                 }
                 h2 {
                     text-align: center;
                 }
-                form {
-                    text-align: center;
-                }
                 button {
-                    margin-top: 10px;
                     padding: 10px 20px;
-                    font-size: 18px;
-                    background-color: #333;
-                    color: white;
+                    background-color: #008CBA;
                     border: none;
+                    color: white;
+                    font-size: 18px;
                     cursor: pointer;
                 }
                 button:hover {
-                    background-color: #555;
+                    background-color: #005f73;
+                }
+                label {
+                    font-size: 18px;
+                }
+                @keyframes gradientAnimation {
+                    0% {
+                        background-position: 0% 50%;
+                    }
+                    50% {
+                        background-position: 100% 50%;
+                    }
+                    100% {
+                        background-position: 0% 50%;
+                    }
                 }
             </style>
         </head>
