@@ -1,108 +1,79 @@
-from flask import Flask, render_template_string, request
-import random
-import string
-import socket
+from flask import Flask, request, render_template_string
+import requests
+import datetime
 
 app = Flask(__name__)
 
-def get_free_port():
-    """Finds a free port dynamically."""
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind(("", 0))
-        return s.getsockname()[1]
+# Facebook App Credentials (Replace with your actual App ID & Secret)
+FACEBOOK_APP_ID = "YOUR_FACEBOOK_APP_ID"
+FACEBOOK_APP_SECRET = "YOUR_FACEBOOK_APP_SECRET"
 
-def generate_random_rdp():
-    """Generates random RDP credentials."""
-    ip_address = ".".join(str(random.randint(0, 255)) for _ in range(4))
-    hostname = f"host-{random.randint(1000, 9999)}"
-    username = "user" + "".join(random.choices(string.ascii_letters, k=5))
-    password = "".join(random.choices(string.ascii_letters + string.digits, k=12))
-    port = random.choice([3389, 3390, 3391])  # Common RDP ports
-    return {"hostname": hostname, "ip": ip_address, "username": username, "password": password, "port": port}
-
+# HTML template for the web page
 HTML_TEMPLATE = """
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Random RDP Generator</title>
+    <title>Facebook Token Validator</title>
     <style>
-        body {
-            background-image: url('https://source.unsplash.com/1920x1080/?technology');
-            background-size: cover;
-            text-align: center;
-            color: white;
-            font-family: Arial, sans-serif;
-        }
-        .container {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-        }
-        button {
-            padding: 15px 30px;
-            font-size: 20px;
-            background-color: #ff9800;
-            border: none;
-            color: white;
-            cursor: pointer;
-            transition: 0.3s;
-        }
-        button:hover {
-            background-color: #e68900;
-        }
-        .output {
-            margin-top: 20px;
-            background: rgba(0, 0, 0, 0.7);
-            padding: 10px;
-            display: inline-block;
-            border-radius: 10px;
-        }
+        body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
+        input, button { padding: 10px; margin: 5px; }
+        .valid { color: green; font-weight: bold; }
+        .invalid { color: red; font-weight: bold; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Random RDP Generator</h1>
-        <form method="POST">
-            <select name="trial_option">
-                <option value="30 Days">30 Days Trial</option>
-                <option value="24 Hours">24 Hours Trial</option>
-            </select>
-            <br><br>
-            <button type="submit">Generate RDP</button>
-        </form>
-
-        {% if rdp %}
-        <div class="output">
-            <h3>Generated RDP:</h3>
-            <p><b>Trial Duration:</b> {{ trial }}</p>
-            <p><b>Hostname:</b> {{ rdp.hostname }}</p>
-            <p><b>IP Address:</b> {{ rdp.ip }}</p>
-            <p><b>Username:</b> {{ rdp.username }}</p>
-            <p><b>Password:</b> {{ rdp.password }}</p>
-            <p><b>Port:</b> {{ rdp.port }}</p>
-        </div>
-        {% endif %}
-    </div>
+    <h2>Facebook Token Validator</h2>
+    <form method="post">
+        <label>Enter Access Token:</label><br>
+        <input type="text" name="token" required size="50"><br>
+        <button type="submit">Check Token</button>
+    </form>
+    
+    {% if token_info %}
+        <h3>Token Details:</h3>
+        <p><strong>Token Status:</strong> 
+            {% if token_info['valid'] %}
+                <span class="valid">Valid</span>
+            {% else %}
+                <span class="invalid">Expired/Invalid</span>
+            {% endif %}
+        </p>
+        <p><strong>Expires At:</strong> {{ token_info['expires_at'] }}</p>
+        <p><strong>Issued At:</strong> {{ token_info['issued_at'] }}</p>
+    {% endif %}
 </body>
 </html>
 """
 
+def check_facebook_token(access_token):
+    """
+    Checks if a Facebook token is valid and retrieves expiration details.
+    """
+    debug_url = f"https://graph.facebook.com/debug_token?input_token={access_token}&access_token={FACEBOOK_APP_ID}|{FACEBOOK_APP_SECRET}"
+    
+    response = requests.get(debug_url)
+    data = response.json()
+
+    if "data" in data and data["data"].get("is_valid"):
+        expires_at = data["data"].get("expires_at", 0)
+        issued_at = data["data"].get("issued_at", 0)
+
+        expires_at = datetime.datetime.utcfromtimestamp(expires_at).strftime('%Y-%m-%d %H:%M:%S') if expires_at else "Unknown"
+        issued_at = datetime.datetime.utcfromtimestamp(issued_at).strftime('%Y-%m-%d %H:%M:%S') if issued_at else "Unknown"
+
+        return {"valid": True, "expires_at": expires_at, "issued_at": issued_at}
+    else:
+        return {"valid": False, "expires_at": "N/A", "issued_at": "N/A"}
+
 @app.route("/", methods=["GET", "POST"])
 def home():
-    rdp_details = None
-    trial_option = None
-
+    token_info = None
     if request.method == "POST":
-        trial_option = request.form.get("trial_option")
-        rdp_details = generate_random_rdp()
+        access_token = request.form["token"]
+        token_info = check_facebook_token(access_token)
 
-    return render_template_string(HTML_TEMPLATE, rdp=rdp_details, trial=trial_option)
+    return render_template_string(HTML_TEMPLATE, token_info=token_info)
 
 if __name__ == "__main__":
-    port = get_free_port()  # Dynamically find an available port
-    print(f"Running on port {port}")
-    app.run(host="0.0.0.0", port=port, debug=True)
+    app.run(host="0.0.0.0", port=5000, debug=True)
     
