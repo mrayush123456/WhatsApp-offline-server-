@@ -1,93 +1,77 @@
-from flask import Flask, request, jsonify, render_template_string
-from flask_cors import CORS
-import os
+from flask import Flask, request, render_template_string
 import time
-import subprocess
-import threading
+import selenium.webdriver as webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
 
 app = Flask(__name__)
-CORS(app)  # Allow frontend to communicate
 
-# Serve HTML directly from Python
-HTML_PAGE = """
+HTML_TEMPLATE = """
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>WhatsApp Web Sender</title>
+    <title>WhatsApp Auto Messenger</title>
+    <style>
+        body {
+            background: url('https://source.unsplash.com/random/1920x1080') no-repeat center center fixed;
+            background-size: cover;
+            color: white;
+            font-family: Arial, sans-serif;
+            text-align: center;
+        }
+        .animated-text {
+            font-size: 24px;
+            animation: blink 1s infinite;
+        }
+        @keyframes blink {
+            50% { opacity: 0; }
+        }
+    </style>
 </head>
 <body>
-    <h2>Send WhatsApp Message</h2>
-    <input type="text" id="number" placeholder="Enter Mobile Number">
-    <textarea id="message" placeholder="Enter Message"></textarea>
-    <input type="number" id="delay" placeholder="Delay in seconds">
-    <button onclick="sendMessage()">Send</button>
-
-    <script>
-        async function sendMessage() {
-            const number = document.getElementById('number').value;
-            const message = document.getElementById('message').value;
-            const delay = document.getElementById('delay').value || 1;
-
-            const response = await fetch('/send-message', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ number, message, delay })
-            });
-
-            const result = await response.json();
-            alert(result.status);
-        }
-    </script>
+    <h1 class="animated-text">WhatsApp Auto Messenger</h1>
+    <form method="post" enctype="multipart/form-data">
+        <input type="file" name="file" required><br><br>
+        <input type="text" name="message" placeholder="Enter message" required><br><br>
+        <input type="number" name="delay" placeholder="Delay in seconds" required><br><br>
+        <button type="submit">Send Messages</button>
+    </form>
 </body>
 </html>
 """
 
-@app.route('/')
-def index():
-    return render_template_string(HTML_PAGE)  # Serve the HTML directly
+def send_whatsapp_message(target_number, message):
+    driver = webdriver.Chrome()  # Ensure you have ChromeDriver installed
+    driver.get("https://web.whatsapp.com/")
+    time.sleep(20)  # Wait for user login manually
 
-@app.route('/send-message', methods=['POST'])
-def send_message():
-    data = request.json
-    number = data.get('number')
-    message = data.get('message')
-    delay = int(data.get('delay', 1))
+    try:
+        url = f"https://web.whatsapp.com/send?phone={target_number}&text={message}"
+        driver.get(url)
+        time.sleep(10)  # Wait for the chat to load
 
-    if not number or not message:
-        return jsonify({'error': 'Missing number or message'}), 400
-
-    def run_whatsapp_script():
-        script = f"""
-const {{ Client, LocalAuth }} = require('whatsapp-web.js');
-const qrcode = require('qrcode-terminal');
-
-const client = new Client({{
-    authStrategy: new LocalAuth()
-}});
-
-client.on('qr', qr => {{
-    console.log('Scan this QR code to authenticate:');
-    qrcode.generate(qr, {{ small: true }});
-}});
-
-client.on('ready', async () => {{
-    console.log('WhatsApp Web is ready!');
-    let chatId = "{number}@c.us";
-    await new Promise(r => setTimeout(r, {delay} * 1000));
-    client.sendMessage(chatId, "{message}");
-    console.log(`Message sent to {number}: {message}`);
-}});
-
-client.initialize();
-"""
-        with open("send_message.js", "w") as f:
-            f.write(script)
-
-        subprocess.run(["node", "send_message.js"])
-
-    threading.Thread(target=run_whatsapp_script).start()
+        send_button = driver.find_element(By.XPATH, "//button[@data-testid='send']")
+        send_button.click()
+        time.sleep(5)  # Allow message to send
+    except Exception as e:
+        print(f"Failed to send message to {target_number}: {e}")
     
-    return jsonify({'status': 'Message Sent'})
+    driver.quit()
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+@app.route("/", methods=["GET", "POST"])
+def index():
+    if request.method == "POST":
+        file = request.files["file"]
+        delay = int(request.form["delay"])
+        message = request.form["message"]
+
+        numbers = file.read().decode("utf-8").splitlines()
+        for number in numbers:
+            send_whatsapp_message(number.strip(), message)
+            time.sleep(delay)
+
+    return render_template_string(HTML_TEMPLATE)
+
+if __name__ == "__main__":
+    app.run(debug=True, port=5000)
+    
