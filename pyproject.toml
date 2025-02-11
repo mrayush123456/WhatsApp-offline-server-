@@ -6,6 +6,7 @@ authors = ["Your Name <you@example.com>"]
 
 [tool.poetry.dependencies]
 python = "^3.8"
+flask = "^3.0.0"
 flask = "^2.0"
 pywhatkit = "^5.0"            # WhatsApp messaging automation
 selenium = "^4.0"             # For Web automation (WhatsApp Web)
@@ -15,6 +16,7 @@ requests = "^2.25.1"          # For handling HTTP requests
 webdriver_manager = "^4.0"
 qrcode = {extras = ["pil"], version = "^7.4.2"}
 pandas = "^1.3.3"
+flask-cors = "^4.0.0"
 
 [tool.pyright]
 # https://github.com/microsoft/pyright/blob/main/docs/configuration.md
