@@ -7,7 +7,6 @@ authors = ["Your Name <you@example.com>"]
 [tool.poetry.dependencies]
 python = "^3.8"
 flask = "^3.0.0"
-flask = "^2.0"
 pywhatkit = "^5.0"            # WhatsApp messaging automation
 selenium = "^4.0"             # For Web automation (WhatsApp Web)
 twilio = "^7.0"               # For sending messages via Twilio API
