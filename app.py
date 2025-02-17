@@ -1,159 +1,122 @@
-import time
-import pyautogui
 from flask import Flask, request, jsonify
 from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.chrome.options import Options
-from PIL import Image
+from selenium.webdriver.common.by import By
+import time
+import threading
 import os
+from webdriver_manager.chrome import ChromeDriverManager
 
 app = Flask(__name__)
 
-# Set up Chrome options for headless mode (optional)
-chrome_options = Options()
-chrome_options.add_argument("--headless")
-chrome_options.add_argument("--disable-gpu")
+# Global variables
+driver = None
+stop_flag = False
 
-# Set up WebDriver
-def initialize_driver():
-    service = Service(executable_path='/path/to/chromedriver')  # Path to chromedriver
-    driver = webdriver.Chrome(service=service, options=chrome_options)
-    driver.get('https://web.whatsapp.com')
-    return driver
+def start_whatsapp():
+    global driver
+    options = webdriver.ChromeOptions()
+    options.add_argument("--user-data-dir=./whatsapp_session")  # Save session
+    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+    driver.get("https://web.whatsapp.com")
+    time.sleep(15)  # Wait for manual QR code scan
 
-# Function to verify OTP
-def verify_otp(driver, otp_code):
-    # You need to inspect WhatsApp Web's elements for the OTP input field
-    otp_input = driver.find_element(By.XPATH, "//input[@type='text']")
-    otp_input.send_keys(otp_code)
-    otp_input.send_keys(Keys.RETURN)
-
-# Function to send a message
-def send_message(driver, target_number, message):
-    # You need to set up the element to search for the contact in WhatsApp Web
-    search_box = driver.find_element(By.XPATH, "//div[@contenteditable='true']")
-    search_box.send_keys(target_number)
-    time.sleep(2)
-    search_box.send_keys(Keys.RETURN)
-    time.sleep(2)
-    
-    message_box = driver.find_element(By.XPATH, "//div[@contenteditable='true']")
-    message_box.send_keys(message)
-    message_box.send_keys(Keys.RETURN)
+def send_message(phone, message, delay):
+    global stop_flag
+    try:
+        url = f"https://web.whatsapp.com/send?phone={phone}&text={message}"
+        driver.get(url)
+        time.sleep(5)
+        
+        # Press send button
+        send_button = driver.find_element(By.XPATH, '//button[@data-testid="compose-btn-send"]')
+        send_button.click()
+        time.sleep(delay)
+    except Exception as e:
+        print(f"Error sending message: {e}")
 
 @app.route('/')
-def home():
+def index():
     return '''
-        <html lang="en">
-            <head>
-                <meta charset="UTF-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>WhatsApp Automation</title>
-                <style>
-                    body {
-                        background-image: url('background.jpg');
-                        background-size: cover;
-                    }
-                    button {
-                        padding: 10px 20px;
-                        font-size: 16px;
-                        margin: 10px;
-                        border: none;
-                        cursor: pointer;
-                        transition: transform 0.3s ease;
-                    }
-                    button:hover {
-                        transform: scale(1.1);
-                    }
-                    .file-input {
-                        margin-top: 10px;
-                    }
-                </style>
-            </head>
-            <body>
-                <h1>WhatsApp Automation</h1>
-                <form id="otp-form">
-                    <label for="otp_code">Enter OTP Code:</label>
-                    <input type="text" id="otp_code" name="otp_code" required>
-                    <button type="submit">Verify OTP</button>
-                </form>
-
-                <form id="message-form">
-                    <label for="target_number">Target WhatsApp Number:</label>
-                    <input type="text" id="target_number" name="target_number" required><br><br>
-                    <label for="message_file">Select Message File:</label>
-                    <input type="file" id="message_file" class="file-input" accept=".txt" required><br><br>
-                    <button type="submit">Send Message</button>
-                </form>
-
-                <button id="stop-button" onclick="stopAutomation()">Stop Automation</button>
-
-                <script>
-                    document.getElementById('otp-form').addEventListener('submit', function(event) {
-                        event.preventDefault();
-                        const otp_code = document.getElementById('otp_code').value;
-                        fetch('/login', {
-                            method: 'POST',
-                            body: new URLSearchParams({
-                                otp_code: otp_code
-                            })
-                        }).then(response => response.json())
-                          .then(data => alert(data.message));
-                    });
-
-                    document.getElementById('message-form').addEventListener('submit', function(event) {
-                        event.preventDefault();
-                        const target_number = document.getElementById('target_number').value;
-                        const message_file = document.getElementById('message_file').files[0];
-                        
-                        const formData = new FormData();
-                        formData.append('target_number', target_number);
-                        formData.append('message_file', message_file);
-
-                        fetch('/send_message', {
-                            method: 'POST',
-                            body: formData
-                        }).then(response => response.json())
-                          .then(data => alert(data.message));
-                    });
-
-                    function stopAutomation() {
-                        fetch('/stop', {
-                            method: 'POST'
-                        }).then(response => response.json())
-                          .then(data => alert(data.message));
-                    }
-                </script>
-            </body>
-        </html>
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>WhatsApp Automation</title>
+        <style>
+            body {
+                background-image: url('/static/bg.jpg');
+                background-size: cover;
+                font-family: Arial, sans-serif;
+                text-align: center;
+                color: white;
+            }
+            .container {
+                margin-top: 50px;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>WhatsApp Bulk Message Sender</h1>
+            <form id="uploadForm" enctype="multipart/form-data">
+                <input type="file" name="file" accept=".txt" required><br><br>
+                <label>Delay (Seconds):</label>
+                <input type="number" name="delay" value="5"><br><br>
+                <button type="button" onclick="startSending()">Start</button>
+                <button type="button" onclick="stopSending()">Stop</button>
+            </form>
+        </div>
+        <script>
+            function startSending() {
+                var formData = new FormData(document.getElementById("uploadForm"));
+                fetch("/start", { method: "POST", body: formData })
+                    .then(response => response.json())
+                    .then(data => alert(data.status));
+            }
+            
+            function stopSending() {
+                fetch("/stop", { method: "POST" })
+                    .then(response => response.json())
+                    .then(data => alert(data.status));
+            }
+        </script>
+    </body>
+    </html>
     '''
 
-@app.route('/login', methods=['POST'])
-def login():
-    otp_code = request.form.get('otp_code')
-    driver = initialize_driver()
-    verify_otp(driver, otp_code)
-    return jsonify({"message": "Login successful!"})
-
-@app.route('/send_message', methods=['POST'])
-def send_whatsapp_message():
-    target_number = request.form.get('target_number')
-    message_file = request.files['message_file']
-    message = message_file.read().decode('utf-8')
+@app.route('/start', methods=['POST'])
+def start():
+    global stop_flag
+    stop_flag = False
+    file = request.files['file']
+    delay = int(request.form['delay'])
     
-    driver = initialize_driver()
-    send_message(driver, target_number, message)
-    return jsonify({"message": "Message sent!"})
+    if file:
+        file_path = "messages.txt"
+        file.save(file_path)
+        
+        # Read numbers and messages
+        with open(file_path, "r") as f:
+            lines = f.readlines()
+        
+        # Start sending messages in a new thread
+        def send_messages():
+            for line in lines:
+                if stop_flag:
+                    break
+                phone, message = line.strip().split(",", 1)
+                send_message(phone, message, delay)
+        
+        threading.Thread(target=send_messages).start()
+    
+    return jsonify({"status": "Started sending messages"})
 
 @app.route('/stop', methods=['POST'])
 def stop():
-    # Logic to stop the automation or close the WebDriver
-    driver.quit()
-    return jsonify({"message": "Automation stopped!"})
+    global stop_flag
+    stop_flag = True
+    return jsonify({"status": "Stopped sending messages"})
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
-    
-    
+    app.run(debug=True, host='0.0.0.0', port=5000)
+        
