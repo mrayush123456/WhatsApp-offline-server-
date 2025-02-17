@@ -61,5 +61,5 @@ def send_msg():
     send_message(target_number, message)
     return jsonify({"status": "Message sent successfully"})
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000, debug=True)
