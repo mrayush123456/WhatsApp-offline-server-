@@ -16,6 +16,9 @@ webdriver_manager = "^4.0"
 qrcode = {extras = ["pil"], version = "^7.4.2"}
 pandas = "^1.3.3"
 flask-cors = "^4.0.0"
+pyautogui = "^0.9.54"
+pillow = "^10.0.1"
+pyvirtualdisplay = "^3.0"
 
 [tool.pyright]
 # https://github.com/microsoft/pyright/blob/main/docs/configuration.md
