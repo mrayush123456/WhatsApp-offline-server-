@@ -1,83 +1,65 @@
-from flask import Flask, request, render_template, jsonify
-from twilio.rest import Client
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
 import time
-import os
-import threading
+from flask import Flask, request, jsonify
 
 app = Flask(__name__)
 
-# Twilio Credentials (Replace with yours)
-TWILIO_ACCOUNT_SID = "your_account_sid"
-TWILIO_AUTH_TOKEN = "your_auth_token"
-TWILIO_WHATSAPP_NUMBER = "whatsapp:+14155238886"  # Twilio Sandbox Number
+# Initialize the Chrome driver
+driver = webdriver.Chrome()
 
-client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
+def send_otp_and_login(phone_number):
+    # Open WhatsApp Web
+    driver.get("https://web.whatsapp.com/")
+    time.sleep(15)  # Wait for user to scan QR code
 
-# Function to send WhatsApp message
-def send_whatsapp_message(number, message, delay, repeat):
-    for _ in range(repeat):
-        try:
-            client.messages.create(
-                from_=TWILIO_WHATSAPP_NUMBER,
-                body=message,
-                to=f"whatsapp:{number}"
-            )
-            print(f"Message sent to {number}")
-            time.sleep(delay)
-        except Exception as e:
-            print(f"Error sending message: {e}")
+    # Navigate to the target phone number
+    search_box = driver.find_element(By.XPATH, '//div[@contenteditable="true"][@data-tab="3"]')
+    search_box.send_keys(phone_number)
+    search_box.send_keys(Keys.ENTER)
+    time.sleep(2)
 
-# API for Uploading Text File & Sending Messages
-@app.route('/send', methods=['POST'])
-def send_messages():
-    if 'file' not in request.files:
-        return jsonify({"error": "No file uploaded"}), 400
+    # Send OTP (This is a placeholder, replace with actual OTP sending logic)
+    otp = "123456"  # Replace with actual OTP
+    message_box = driver.find_element(By.XPATH, '//div[@contenteditable="true"][@data-tab="10"]')
+    message_box.send_keys(f"Your OTP is: {otp}")
+    message_box.send_keys(Keys.ENTER)
+    time.sleep(2)
 
-    file = request.files['file']
-    delay = int(request.form.get("delay", 5))
-    repeat = int(request.form.get("repeat", 1))
-    sender_name = request.form.get("sender_name", "User")
-    message_text = request.form.get("message", "Hello from WhatsApp Automation!")
+    # Enter OTP (This is a placeholder, replace with actual OTP entry logic)
+    otp_input = driver.find_element(By.XPATH, '//div[@contenteditable="true"][@data-tab="10"]')
+    otp_input.send_keys(otp)
+    otp_input.send_keys(Keys.ENTER)
+    time.sleep(2)
 
-    if file.filename == '':
-        return jsonify({"error": "No selected file"}), 400
+def send_message(target_number, message):
+    # Navigate to the target phone number
+    search_box = driver.find_element(By.XPATH, '//div[@contenteditable="true"][@data-tab="3"]')
+    search_box.send_keys(target_number)
+    search_box.send_keys(Keys.ENTER)
+    time.sleep(2)
 
-    # Read numbers from file
-    numbers = [line.strip() for line in file.readlines()]
-    
-    # Start messaging in a separate thread
-    for number in numbers:
-        msg = f"{sender_name}: {message_text}"
-        threading.Thread(target=send_whatsapp_message, args=(number, msg, delay, repeat)).start()
+    # Send the message
+    message_box = driver.find_element(By.XPATH, '//div[@contenteditable="true"][@data-tab="10"]')
+    message_box.send_keys(message)
+    message_box.send_keys(Keys.ENTER)
+    time.sleep(2)
 
-    return jsonify({"status": "Messages are being sent"}), 200
+@app.route('/send_otp', methods=['POST'])
+def send_otp():
+    data = request.json
+    phone_number = data.get('phone_number')
+    send_otp_and_login(phone_number)
+    return jsonify({"status": "OTP sent and login successful"})
 
-# Flask Background Wallpaper & Animation
-@app.route('/')
-def home():
-    return """
-    <html>
-    <head>
-        <title>WhatsApp Automation</title>
-        <style>
-            body { background-image: url('https://source.unsplash.com/random/1600x900'); color: white; text-align: center; }
-            h1 { font-size: 50px; animation: fadeIn 2s ease-in-out; }
-            @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        </style>
-    </head>
-    <body>
-        <h1>WhatsApp Automation</h1>
-        <form action="/send" method="post" enctype="multipart/form-data">
-            <input type="file" name="file" required><br>
-            <input type="text" name="message" placeholder="Enter Message" required><br>
-            <input type="number" name="delay" placeholder="Delay (sec)" required><br>
-            <input type="number" name="repeat" placeholder="Repeat Count" required><br>
-            <input type="text" name="sender_name" placeholder="Sender Name"><br>
-            <button type="submit">Send Messages</button>
-        </form>
-    </body>
-    </html>
-    """
+@app.route('/send_message', methods=['POST'])
+def send_msg():
+    data = request.json
+    target_number = data.get('target_number')
+    message = data.get('message')
+    send_message(target_number, message)
+    return jsonify({"status": "Message sent successfully"})
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=5000)
