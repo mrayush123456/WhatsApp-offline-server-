@@ -1,125 +1,123 @@
-from flask import Flask, request, redirect, url_for, render_template_string
+from flask import Flask, request, render_template_string, redirect, url_for
+from twilio.rest import Client
+import time
+import os
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.common.by import By
 from webdriver_manager.chrome import ChromeDriverManager
-import time
-import threading
-import os
 
 app = Flask(__name__)
+app.secret_key = "your_secret_key"
 
-# Global variables
-driver = None
-stop_flag = False
+# Twilio Credentials
+TWILIO_SID = "your_twilio_sid"
+TWILIO_AUTH_TOKEN = "your_twilio_auth_token"
+TWILIO_WHATSAPP_NUMBER = "whatsapp:+14155238886"
 
-def start_whatsapp():
-    global driver
-    service = Service(ChromeDriverManager().install())
-    options = webdriver.ChromeOptions()
-    options.add_argument("--user-data-dir=./chrome_data")  # Save login session
-    options.add_argument("--disable-blink-features=AutomationControlled")  
-    driver = webdriver.Chrome(service=service, options=options)
-    
+client = Client(TWILIO_SID, TWILIO_AUTH_TOKEN)
+
+# Selenium WebDriver Setup
+options = webdriver.ChromeOptions()
+options.add_argument("--headless")
+options.add_argument("--disable-gpu")
+options.add_argument("--no-sandbox")
+options.add_argument("--window-size=1920,1080")
+
+driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+
+def login_whatsapp():
     driver.get("https://web.whatsapp.com")
-    time.sleep(15)  # Wait for QR Code Scan
+    time.sleep(10)
+    qr_path = "static/qr.png"
+    driver.save_screenshot(qr_path)
+    return qr_path
 
-def send_message(phone_number, message, delay=3):
-    global driver, stop_flag
+@app.route("/", methods=["GET", "POST"])
+def home():
+    if request.method == "POST":
+        phone = request.form.get("phone")
+        message = request.form.get("message")
+        file = request.files.get("file")
+        delay = int(request.form.get("delay", 1))
 
-    if driver is None:
-        start_whatsapp()
-
-    # Open chat
-    driver.get(f"https://web.whatsapp.com/send?phone={phone_number}&text={message}")
-    time.sleep(delay)
-
-    # Click send button
-    try:
-        send_button = driver.find_element(By.XPATH, '//button[@data-testid="compose-btn-send"]')
-        send_button.click()
-        time.sleep(2)
-    except Exception as e:
-        print(f"Error sending message: {e}")
-
-INDEX_HTML = """
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WhatsApp Automation</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-image: url('https://source.unsplash.com/random/1600x900');
-            background-size: cover;
-            text-align: center;
-            padding: 50px;
-        }
-        form {
-            background: rgba(255, 255, 255, 0.8);
-            padding: 20px;
-            display: inline-block;
-            border-radius: 10px;
-        }
-        input, textarea, button {
-            margin: 10px;
-            padding: 10px;
-            width: 90%;
-        }
-    </style>
-</head>
-<body>
-    <h1>WhatsApp Message Sender</h1>
-    <form action="/send" method="post">
-        <input type="text" name="phone" placeholder="Enter WhatsApp number or TXT file" required><br>
-        <textarea name="message" placeholder="Enter your message" required></textarea><br>
-        <input type="number" name="delay" placeholder="Delay (seconds)" value="3"><br>
-        <button type="submit">Send Message</button>
-    </form>
-    <form action="/stop" method="post">
-        <button type="submit" style="background:red; color:white;">Stop</button>
-    </form>
-</body>
-</html>
-"""
-
-@app.route("/")
-def index():
-    return render_template_string(INDEX_HTML)
-
-@app.route("/send", methods=["POST"])
-def send():
-    global stop_flag
-    phone_number = request.form["phone"]
-    message = request.form["message"]
-    delay = int(request.form["delay"])
-
-    stop_flag = False  # Reset stop flag
-
-    def send_process():
-        if phone_number.endswith(".txt"):  # If a text file is provided
-            with open(phone_number, "r") as file:
-                for line in file:
-                    if stop_flag:
-                        break
-                    num = line.strip()
-                    send_message(num, message, delay)
-                    time.sleep(delay)
+        if file:
+            file_path = "uploads/" + file.filename
+            file.save(file_path)
+            with open(file_path, "r") as f:
+                numbers = f.readlines()
+            
+            for num in numbers:
+                send_whatsapp_message(num.strip(), message)
+                time.sleep(delay)
         else:
-            send_message(phone_number, message, delay)
+            send_whatsapp_message(phone, message)
 
-    thread = threading.Thread(target=send_process)
-    thread.start()
+        return redirect(url_for("home"))
 
-    return redirect(url_for("index"))
+    qr_code = login_whatsapp()
+    html_template = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>WhatsApp Automation</title>
+        <style>
+            body {{
+                background-image: url('/static/bg.jpg');
+                background-size: cover;
+                font-family: Arial, sans-serif;
+                text-align: center;
+                color: white;
+            }}
+            form {{
+                margin: 20px auto;
+                padding: 20px;
+                background: rgba(0, 0, 0, 0.7);
+                display: inline-block;
+                border-radius: 10px;
+            }}
+        </style>
+    </head>
+    <body>
+        <h2>WhatsApp Automation</h2>
+        <img src="{qr_code}" width="200"><br><br>
 
-@app.route("/stop", methods=["POST"])
+        <form method="POST" enctype="multipart/form-data">
+            <label>Target WhatsApp Number:</label>
+            <input type="text" name="phone" required><br><br>
+            
+            <label>Message:</label>
+            <textarea name="message" required></textarea><br><br>
+
+            <label>Upload TXT File (optional):</label>
+            <input type="file" name="file"><br><br>
+
+            <label>Delay (seconds):</label>
+            <input type="number" name="delay" value="1"><br><br>
+
+            <button type="submit">Send Message</button>
+        </form>
+
+        <br>
+        <a href="/stop"><button>Stop</button></a>
+    </body>
+    </html>
+    """
+    return render_template_string(html_template)
+
+def send_whatsapp_message(to, message):
+    try:
+        client.messages.create(
+            body=message,
+            from_=TWILIO_WHATSAPP_NUMBER,
+            to=f"whatsapp:+{to}"
+        )
+    except Exception as e:
+        print("Error:", e)
+
+@app.route("/stop")
 def stop():
-    global stop_flag
-    stop_flag = True
-    return redirect(url_for("index"))
+    driver.quit()
+    return "WhatsApp Automation Stopped"
     
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
