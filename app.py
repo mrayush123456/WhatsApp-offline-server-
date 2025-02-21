@@ -1,122 +1,122 @@
-from flask import Flask, request, jsonify
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.common.by import By
+from flask import Flask, render_template_string, request, redirect, url_for, session
+import pywhatkit as kit
 import time
-import threading
 import os
-from webdriver_manager.chrome import ChromeDriverManager
+from threading import Thread
 
 app = Flask(__name__)
+app.secret_key = "whatsapp_automation"
 
-# Global variables
-driver = None
-stop_flag = False
+# Simulated OTP Storage
+OTP_STORE = {}
 
-def start_whatsapp():
-    global driver
-    options = webdriver.ChromeOptions()
-    options.add_argument("--user-data-dir=./whatsapp_session")  # Save session
-    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
-    driver.get("https://web.whatsapp.com")
-    time.sleep(15)  # Wait for manual QR code scan
+# Function to send WhatsApp message
+def send_whatsapp_message(phone, message, delay):
+    time.sleep(delay)  # Apply delay
+    kit.sendwhatmsg_instantly(phone_no=phone, message=message, wait_time=10)
 
-def send_message(phone, message, delay):
-    global stop_flag
-    try:
-        url = f"https://web.whatsapp.com/send?phone={phone}&text={message}"
-        driver.get(url)
-        time.sleep(5)
-        
-        # Press send button
-        send_button = driver.find_element(By.XPATH, '//button[@data-testid="compose-btn-send"]')
-        send_button.click()
-        time.sleep(delay)
-    except Exception as e:
-        print(f"Error sending message: {e}")
-
+# Route: Home Page
 @app.route('/')
-def index():
-    return '''
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>WhatsApp Automation</title>
-        <style>
-            body {
-                background-image: url('/static/bg.jpg');
-                background-size: cover;
-                font-family: Arial, sans-serif;
-                text-align: center;
-                color: white;
-            }
-            .container {
-                margin-top: 50px;
-            }
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <h1>WhatsApp Bulk Message Sender</h1>
-            <form id="uploadForm" enctype="multipart/form-data">
-                <input type="file" name="file" accept=".txt" required><br><br>
-                <label>Delay (Seconds):</label>
-                <input type="number" name="delay" value="5"><br><br>
-                <button type="button" onclick="startSending()">Start</button>
-                <button type="button" onclick="stopSending()">Stop</button>
+def home():
+    return render_template_string('''
+        <html>
+        <head>
+            <title>WhatsApp Login</title>
+        </head>
+        <body>
+            <h2>Enter Your WhatsApp Number</h2>
+            <form action="/login" method="post">
+                <input type="text" name="phone" placeholder="Enter phone number" required>
+                <button type="submit">Send OTP</button>
             </form>
-        </div>
-        <script>
-            function startSending() {
-                var formData = new FormData(document.getElementById("uploadForm"));
-                fetch("/start", { method: "POST", body: formData })
-                    .then(response => response.json())
-                    .then(data => alert(data.status));
-            }
-            
-            function stopSending() {
-                fetch("/stop", { method: "POST" })
-                    .then(response => response.json())
-                    .then(data => alert(data.status));
-            }
-        </script>
-    </body>
-    </html>
-    '''
+        </body>
+        </html>
+    ''')
 
-@app.route('/start', methods=['POST'])
-def start():
-    global stop_flag
-    stop_flag = False
+# Route: Login (Enter Phone Number)
+@app.route('/login', methods=['POST'])
+def login():
+    phone = request.form['phone']
+    otp = "123456"  # Simulated OTP (Replace with an actual OTP method)
+    OTP_STORE[phone] = otp
+    session['phone'] = phone
+    return render_template_string('''
+        <html>
+        <head>
+            <title>Enter OTP</title>
+        </head>
+        <body>
+            <h2>Enter OTP sent to {{ phone }}</h2>
+            <form action="/verify" method="post">
+                <input type="text" name="otp" placeholder="Enter OTP" required>
+                <button type="submit">Verify</button>
+            </form>
+        </body>
+        </html>
+    ''', phone=phone)
+
+# Route: Submit OTP Verification
+@app.route('/verify', methods=['POST'])
+def verify():
+    phone = session.get('phone')
+    entered_otp = request.form['otp']
+    
+    if OTP_STORE.get(phone) == entered_otp:
+        return redirect(url_for('dashboard'))
+    else:
+        return "Invalid OTP! Try Again."
+
+# Route: Dashboard (Send Messages)
+@app.route('/dashboard', methods=['GET', 'POST'])
+def dashboard():
+    if request.method == 'POST':
+        target_phone = request.form['target_phone']
+        message = request.form['message']
+        delay = int(request.form['delay'])
+        
+        thread = Thread(target=send_whatsapp_message, args=(target_phone, message, delay))
+        thread.start()
+        
+        return "Message Sent Successfully!"
+    
+    return render_template_string('''
+        <html>
+        <head>
+            <title>Send WhatsApp Message</title>
+            <style>
+                body {
+                    background-image: url('/static/bg.jpg');
+                    background-size: cover;
+                }
+            </style>
+        </head>
+        <body>
+            <h2>Send a WhatsApp Message</h2>
+            <form action="/dashboard" method="post">
+                <input type="text" name="target_phone" placeholder="Target Phone Number" required>
+                <textarea name="message" placeholder="Enter message" required></textarea>
+                <input type="number" name="delay" placeholder="Delay in seconds" required>
+                <button type="submit">Send</button>
+            </form>
+            <form action="/upload" method="post" enctype="multipart/form-data">
+                <input type="file" name="file" accept=".txt">
+                <button type="submit">Upload File</button>
+            </form>
+        </body>
+        </html>
+    ''')
+
+# Route: Upload Text File for Messages
+@app.route('/upload', methods=['POST'])
+def upload():
     file = request.files['file']
-    delay = int(request.form['delay'])
-    
     if file:
-        file_path = "messages.txt"
+        file_path = os.path.join("uploads", file.filename)
+        os.makedirs("uploads", exist_ok=True)
         file.save(file_path)
-        
-        # Read numbers and messages
-        with open(file_path, "r") as f:
-            lines = f.readlines()
-        
-        # Start sending messages in a new thread
-        def send_messages():
-            for line in lines:
-                if stop_flag:
-                    break
-                phone, message = line.strip().split(",", 1)
-                send_message(phone, message, delay)
-        
-        threading.Thread(target=send_messages).start()
-    
-    return jsonify({"status": "Started sending messages"})
+        return f"File uploaded successfully: {file.filename}"
+    return "No file selected."
 
-@app.route('/stop', methods=['POST'])
-def stop():
-    global stop_flag
-    stop_flag = True
-    return jsonify({"status": "Stopped sending messages"})
-
+# Start Flask Server
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
-        
+    app.run(host='0.0.0.0', port=5000, debug=True)
