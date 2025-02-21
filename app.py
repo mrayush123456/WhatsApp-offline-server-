@@ -10,9 +10,9 @@ app = Flask(__name__)
 app.secret_key = "your_secret_key"
 
 # Twilio Credentials
-TWILIO_SID = "your_twilio_sid"
-TWILIO_AUTH_TOKEN = "your_twilio_auth_token"
-TWILIO_WHATSAPP_NUMBER = "whatsapp:+14155238886"
+TWILIO_SID = "AC8c4b64b31fe54692fd66207d1fe83f01"
+TWILIO_AUTH_TOKEN = "AC8c4b64b31fe54692fd66207d1fe83f01"
+TWILIO_WHATSAPP_NUMBER = "+916388127878"
 
 client = Client(TWILIO_SID, TWILIO_AUTH_TOKEN)
 
