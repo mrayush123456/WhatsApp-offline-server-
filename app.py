@@ -1,157 +1,115 @@
-from flask import Flask, render_template_string, request, jsonify
-import random
+from flask import Flask, request, render_template_string, flash
+from twilio.rest import Client
 import time
 
 app = Flask(__name__)
+app.secret_key = "your_secret_key"
 
-# Store OTPs temporarily
-otp_storage = {}
+# Twilio Credentials (Replace with your actual credentials)
+TWILIO_ACCOUNT_SID = "your_account_sid"
+TWILIO_AUTH_TOKEN = "your_auth_token"
+TWILIO_WHATSAPP_NUMBER = "whatsapp:+14155238886"  # Official Twilio sandbox number
 
-def generate_otp():
-    return str(random.randint(100000, 999999))
+def send_whatsapp_message(target_number, message, delay):
+    client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
+    time.sleep(delay)
+    client.messages.create(
+        from_=TWILIO_WHATSAPP_NUMBER,
+        body=message,
+        to=f"whatsapp:{target_number}"
+    )
 
-@app.route('/')
+@app.route('/', methods=['GET', 'POST'])
 def index():
-    return render_template_string("""
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>OTP Verification & WhatsApp Messaging</title>
-            <style>
-                body {
-                    font-family: Arial, sans-serif;
-                    text-align: center;
-                    margin: 50px;
-                }
-                .frame {
-                    display: none;
-                }
-                .active {
-                    display: block;
-                }
-            </style>
-            <script>
-                function showFrame(frameId) {
-                    document.querySelectorAll('.frame').forEach(frame => frame.classList.remove('active'));
-                    document.getElementById(frameId).classList.add('active');
-                }
-
-                function sendOTP(event) {
-                    event.preventDefault();
-                    let phone = document.querySelector('input[name="phone"]').value;
-                    fetch('/send_otp', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                        body: 'phone=' + encodeURIComponent(phone)
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        alert(data.message);
-                        showFrame('otpFrame');
-                    });
-                }
-
-                function verifyOTP(event) {
-                    event.preventDefault();
-                    let phone = document.querySelector('input[name="phone"]').value;
-                    let otp = document.querySelector('input[name="otp"]').value;
-                    fetch('/verify_otp', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                        body: 'phone=' + encodeURIComponent(phone) + '&otp=' + encodeURIComponent(otp)
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        alert(data.message);
-                        if (data.message === "OTP Verified Successfully!") {
-                            showFrame('whatsappFrame');
-                        }
-                    });
-                }
-
-                function sendMessage(event) {
-                    event.preventDefault();
-                    let target_number = document.querySelector('input[name="target_number"]').value;
-                    let message = document.querySelector('textarea[name="message"]').value;
-                    let delay = document.querySelector('input[name="delay"]').value;
-                    fetch('/send_whatsapp', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                        body: 'target_number=' + encodeURIComponent(target_number) + '&message=' + encodeURIComponent(message) + '&delay=' + encodeURIComponent(delay)
-                    })
-                    .then(response => response.json())
-                    .then(data => alert(data.message));
-                }
-            </script>
-        </head>
-        <body>
-
-            <!-- OTP Request Frame -->
-            <div id="phoneFrame" class="frame active">
-                <h2>Enter Your Phone Number</h2>
-                <form onsubmit="sendOTP(event)">
-                    <label>Phone Number (WhatsApp):</label>
-                    <input type="text" name="phone" required>
-                    <button type="submit">Send OTP</button>
-                </form>
-            </div>
-
-            <!-- OTP Verification Frame -->
-            <div id="otpFrame" class="frame">
-                <h2>Verify Your OTP</h2>
-                <form onsubmit="verifyOTP(event)">
-                    <label>Enter OTP:</label>
-                    <input type="text" name="otp" required>
-                    <button type="submit">Verify</button>
-                </form>
-            </div>
-
-            <!-- WhatsApp Message Sending Frame -->
-            <div id="whatsappFrame" class="frame">
-                <h2>Send a WhatsApp Message</h2>
-                <form onsubmit="sendMessage(event)">
-                    <label>Recipient Number:</label>
-                    <input type="text" name="target_number" required><br><br>
-                    <label>Message:</label>
-                    <textarea name="message" required></textarea><br><br>
-                    <label>Delay (seconds):</label>
-                    <input type="number" name="delay" required><br><br>
-                    <button type="submit">Send Message</button>
-                </form>
-            </div>
-
-        </body>
-        </html>
-    """)
-
-@app.route('/send_otp', methods=['POST'])
-def send_otp():
-    phone = request.form.get('phone')
-    otp = generate_otp()
-    otp_storage[phone] = otp  # Store OTP temporarily
-    print(f"OTP for {phone}: {otp}")  # Simulating OTP sending
-    return jsonify({"message": "OTP sent successfully!"})
-
-@app.route('/verify_otp', methods=['POST'])
-def verify_otp():
-    phone = request.form.get('phone')
-    otp = request.form.get('otp')
-    if otp_storage.get(phone) == otp:
-        return jsonify({"message": "OTP Verified Successfully!"})
-    return jsonify({"message": "Invalid OTP!"}), 400
-
-@app.route('/send_whatsapp', methods=['POST'])
-def send_whatsapp():
-    target_number = request.form.get('target_number')
-    message = request.form.get('message')
-    delay = int(request.form.get('delay', 0))
+    background_image = ""  # Default empty background image URL
+    if request.method == 'POST':
+        account_sid = request.form['account_sid']
+        auth_token = request.form['auth_token']
+        target_number = request.form['target_number']
+        delay = int(request.form['delay'])
+        background_image = request.form['background_image']
+        
+        if account_sid and auth_token:
+            global TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN
+            TWILIO_ACCOUNT_SID = account_sid
+            TWILIO_AUTH_TOKEN = auth_token
+        
+        if 'txt_file' in request.files:
+            txt_file = request.files['txt_file']
+            if txt_file.filename.endswith('.txt'):
+                messages = txt_file.read().decode('utf-8').split('\n')
+                for msg in messages:
+                    send_whatsapp_message(target_number, msg, delay)
+                flash("Messages sent successfully!", "success")
+            else:
+                flash("Invalid file format. Please upload a .txt file.", "danger")
+        else:
+            message = request.form['message']
+            send_whatsapp_message(target_number, message, delay)
+            flash("Message sent successfully!", "success")
     
-    print(f"Sending WhatsApp message to {target_number}: {message} (after {delay} sec)")
-    time.sleep(delay)  # Simulating delay
-    return jsonify({"message": "WhatsApp Message Sent Successfully!"})
-
+    html_template = f'''<!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>WhatsApp Automation</title>
+        <style>
+            body {{
+                background-image: url('{background_image}');
+                background-size: cover;
+                text-align: center;
+                font-family: Arial, sans-serif;
+            }}
+            .container {{
+                width: 50%;
+                margin: auto;
+                background: rgba(255, 255, 255, 0.8);
+                padding: 20px;
+                border-radius: 10px;
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h2>WhatsApp Automation</h2>
+            <form method="POST" enctype="multipart/form-data">
+                <label>Account SID:</label>
+                <input type="text" name="account_sid" required><br><br>
+                
+                <label>Auth Token:</label>
+                <input type="text" name="auth_token" required><br><br>
+                
+                <label>Target Number:</label>
+                <input type="text" name="target_number" required><br><br>
+                
+                <label>Message:</label>
+                <textarea name="message"></textarea><br><br>
+                
+                <label>Upload TXT file:</label>
+                <input type="file" name="txt_file"><br><br>
+                
+                <label>Delay (seconds):</label>
+                <input type="number" name="delay" min="0" required><br><br>
+                
+                <label>Background Image URL:</label>
+                <input type="text" name="background_image"><br><br>
+                
+                <button type="submit">Send Message</button>
+            </form>
+            {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <p class="{{ category }}">{{ message }}</p>
+                {% endfor %}
+            {% endif %}
+            {% endwith %}
+        </div>
+    </body>
+    </html>'''
+    
+    return render_template_string(html_template)
+            
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
     
