@@ -7,7 +7,6 @@ authors = ["Your Name <you@example.com>"]
 [tool.poetry.dependencies]
 python = "^3.8"
 flask = "^3.0.0"
-pywhatkit = "^5.0"            # WhatsApp messaging automation
 selenium = "^4.0"             # For Web automation (WhatsApp Web)
 twilio = "^7.0"               # For sending messages via Twilio API
 termcolor = "^1.1"            # For colored terminal output
@@ -20,6 +19,8 @@ pyautogui = "^0.9.54"
 pillow = "^10.0.1"
 pyvirtualdisplay = "^3.0"
 xvfbwrapper = "^0.2.9"
+pywhatkit = "^5.4"
+mouseinfo = "^0.1.3"
 
 [tool.pyright]
 # https://github.com/microsoft/pyright/blob/main/docs/configuration.md
